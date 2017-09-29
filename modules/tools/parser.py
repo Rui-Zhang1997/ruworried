@@ -37,9 +37,10 @@ def parse_html(html_dir, html_file):
                 row_data[iid].append(div.text.strip()) # add the div to map
             except KeyError:
                 pass
+    print(row_data)
     
 def parse_dir(html_dir):
     for f in os.listdir(html_dir):
+        print("FILE", f)
         if '.html' in f:
             parse_html(html_dir, f)
-            break
