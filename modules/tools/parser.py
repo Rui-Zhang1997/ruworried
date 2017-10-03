@@ -3,7 +3,7 @@ import os
 from os import path
 import re
 from modules.tools import commons as cms
-from modules import definitions as defs
+from modules import definitions
 
 class DateTime:
     def __init__(self, year, month, day, hour, minute):
@@ -22,7 +22,7 @@ class DateTime:
         return 0
 
 class Crime:
-    def __init__(self, crime_id='', crime_type='', report_date='', occur_date='', location='', disposition=''):
+    def __init__(self, crime_id='', crime_type='', report_date=None, occur_date=None, location='', disposition=''):
         self.crime_id = crime_id
         self.crime_type = crime_type
         self.report_date = report_date
@@ -38,7 +38,8 @@ def extrapolate_row_data(row_data):
     cause = None
     result = None
     dates = []
-    text = ''
+    text = []
+    print(row_data)
     datePattern = re.compile('^[0-9]{2}/[0-9]{2}/[0-9]{2}.*')
     timePattern = re.compile('.*[0-9]{4}hrs.*')
     idPattern = re.compile(C_INCIDENT_PATTERN)
@@ -46,12 +47,11 @@ def extrapolate_row_data(row_data):
     row_data = [s.lower() for s in row_data]
     for datum in row_data:
         if idPattern.search(datum):
-            id_ = datum
+            id_ = datum.split('\n')[0]
         elif datePattern.search(datum) or timePattern.search(datum):
             dates.append(datum)
         else:
-            text += datum
-
+            text.append(datum)
     datetimes = cms.flatten([re.split('\s+', t) for t in dates])
     timestamps = []
     for i in range(0, len(datetimes), 2):
@@ -61,6 +61,9 @@ def extrapolate_row_data(row_data):
     # orders timestamps
     if len(timestamps) == 2:
         timestamps = timestamps if timestamps[0].compare(timestamps[1]) == -1 else [timestamps[1], timestamps[0]]
+    joined_text = ' '.join(text)
+    for status in definitions.DEFINITIONS:
+        loc = re.search(status, joined_text)
 
 def parse_html(html_dir, html_file):
     html_path = path.join(html_dir, html_file)

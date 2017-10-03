@@ -6,3 +6,5 @@ NO_HARM = [
     'unfounded']
 
 ONGOING = ['open/pending']
+
+DEFINITIONS = NO_HARM + ONGOING
