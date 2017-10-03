@@ -3,7 +3,6 @@ import os
 from os import path
 import re
 from modules.tools import commons as cms
-from modules import definitions as defs
 
 class DateTime:
     def __init__(self, year, month, day, hour, minute):
@@ -38,29 +37,25 @@ def extrapolate_row_data(row_data):
     cause = None
     result = None
     dates = []
-    text = ''
+    text = []
     datePattern = re.compile('^[0-9]{2}/[0-9]{2}/[0-9]{2}.*')
-    timePattern = re.compile('.*[0-9]{4}hrs.*')
     idPattern = re.compile(C_INCIDENT_PATTERN)
-    row_data = cms.flatten([re.split('\s+', data) for data in row_data])
-    row_data = [s.lower() for s in row_data]
+    print('ROW-DATA', row_data)
     for datum in row_data:
         if idPattern.search(datum):
             id_ = datum
-        elif datePattern.search(datum) or timePattern.search(datum):
+        elif datePattern.search(datum):
             dates.append(datum)
         else:
-            text += datum
-
+            text.append(datum)
     datetimes = cms.flatten([re.split('\s+', t) for t in dates])
-    timestamps = []
+    print('DATETIMES', dates)
     for i in range(0, len(datetimes), 2):
         dd = datetimes[i].split('/')
-        dt = datetimes[i+1] # if len(datetimes) > i+1 else '0000'
-        timestamps.append(DateTime(dd[2], dd[0], dd[1], dt[0:2], dt[2:4]))
-    # orders timestamps
-    if len(timestamps) == 2:
-        timestamps = timestamps if timestamps[0].compare(timestamps[1]) == -1 else [timestamps[1], timestamps[0]]
+        dt = datetimes[i+1]
+        print(dd, dt)
+        dateTime = DateTime(dd[2], dd[0], dd[1], dt[0:2], dt[2:4])
+        print(dateTime)
 
 def parse_html(html_dir, html_file):
     html_path = path.join(html_dir, html_file)

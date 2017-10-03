@@ -11,4 +11,4 @@ def parse_pdfs():
 
 if __name__ == '__main__':
     # parse_pdfs()
-    parser.parse_dir(PARSED_CRIME_ABS)
+    parser.parse_html(PARSED_CRIME_REPORT_DIR, 'aug.html')
