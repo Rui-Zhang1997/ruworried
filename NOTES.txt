@@ -1,0 +1,9 @@
+RELATING TO EDGE CASES
+It seems that if multiple events are assigned to a single incident number, then
+the other categories will be coalaesced onto their own lines (i.e. what the crime
+was, dates, etc.), which are deliminated by newlines. There is a good possibility
+that these are in order and therefore, could simply be parsed out. A good indication
+of this edge case is if the incident id number is repeated, where n incident numbers
+are deliminated by \n and also indicate the number of events with the same incident
+number.
+
