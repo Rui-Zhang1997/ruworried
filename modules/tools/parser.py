@@ -3,7 +3,7 @@ import os
 from os import path
 import re
 from modules.tools import commons as cms
-from modules import definitions
+from modules import definitions as dfs
 
 class DateTime:
     def __init__(self, year, month, day, hour, minute):
@@ -22,48 +22,68 @@ class DateTime:
         return 0
 
 class Crime:
-    def __init__(self, crime_id='', crime_type='', report_date=None, occur_date=None, location='', disposition=''):
+    def __init__(self, crime_id='', crime_type='', report_time=None, occur_time=None, location='', status=''):
         self.crime_id = crime_id
         self.crime_type = crime_type
-        self.report_date = report_date
-        self.occur_date = occur_date
+        self.report_time = report_time
+        self.occur_time = occur_time
         self.location = location
-        self.disposition = disposition
+        self.status = status
 
 C_INCIDENT_PATTERN = '[0-9]{2}-[0-9]{6}'
 def extrapolate_row_data(row_data):
-    start_time = None
-    end_time = None
-    id_ = None
-    cause = None
-    result = None
-    dates = []
-    text = []
-    print(row_data)
     datePattern = re.compile('^[0-9]{2}/[0-9]{2}/[0-9]{2}.*')
     timePattern = re.compile('.*[0-9]{4}hrs.*')
-    idPattern = re.compile(C_INCIDENT_PATTERN)
-    row_data = cms.flatten([re.split('\s+', data) for data in row_data])
-    row_data = [s.lower() for s in row_data]
-    for datum in row_data:
-        if idPattern.search(datum):
-            id_ = datum.split('\n')[0]
-        elif datePattern.search(datum) or timePattern.search(datum):
-            dates.append(datum)
-        else:
-            text.append(datum)
-    datetimes = cms.flatten([re.split('\s+', t) for t in dates])
-    timestamps = []
-    for i in range(0, len(datetimes), 2):
-        dd = datetimes[i].split('/')
-        dt = datetimes[i+1] # if len(datetimes) > i+1 else '0000'
-        timestamps.append(DateTime(dd[2], dd[0], dd[1], dt[0:2], dt[2:4]))
-    # orders timestamps
-    if len(timestamps) == 2:
-        timestamps = timestamps if timestamps[0].compare(timestamps[1]) == -1 else [timestamps[1], timestamps[0]]
-    joined_text = ' '.join(text)
-    for status in definitions.DEFINITIONS:
-        loc = re.search(status, joined_text)
+    idPattern   = re.compile(C_INCIDENT_PATTERN)
+    id_ = []
+    for d in row_data:
+        if idPattern.search(d):
+            id_ += d.split('\n')
+    del row_data[row_data.index('\n'.join(id_))]
+    incident_count = len(id_)
+    dates = []
+    texts = []
+    crime = Crime()
+    crime.crime_id = id_[0]
+    if incident_count > 1: # processes 1-to-many
+        for d in row_data:
+            if datePattern.search(d):
+                dates.append(d)
+            else:
+                text.append(d)
+        dates = flatten([date.split('\n') for date in dates])
+        texts = flatten([text.split('\n') for text in texts])
+        dt_tuples = [(d,t) for d,t in zip(dates,texts)]
+        for dt_tuple in dt_tuples:
+            date = dt_tuple[0].split(' ')
+            times_list = date[:4]
+            # sorting datetimes to determine report status
+            # joins both strings together and removes all nonnumeric characters
+            dt1 = re.sub('[^0-9]', '', ''.join(times_list[:2]).lower())
+            dt2 = re.sub('[^0-9]', '', ''.join(times_list[2:4]).lower())
+            # converts them to DateTime object
+            dts = [lambda dt: DateTime(dt[:2], dt[2:4], dt[4:6], dt[6:8], dt[8:]) if dt else None for dt in [dt1, dt2]]
+            # sorts them based on latest to earliest
+            dts = dts if dts[0] and dts[1] and dts[0].compare(dts[1]) == 1 else [dts[1], dts[0]]
+            crime.report_time = dts[0]
+            crime.occur_time = dts[1]
+            crime.crime_type = dt_tuple[1]
+            # attempts to extract information regarding location and status
+            text = ' '.join(date[4:]).lower()
+            # parsing crime by type
+            for status in dfs.STATUSES:
+                def_range = re.search(status, text)
+                if def_range:
+                    crime.status = text[def_range.start():def_range.end()]
+                    crime.location = text[:def_range.start()]
+                    break # if one is found, then break for everything else
+    elif incident_count == 1: # processes 1-to-1
+        for d in row_date:
+            if datePattern.search(d):
+                dates.append(d)
+            else:
+                text.append(d)
+    return crime
 
 def parse_html(html_dir, html_file):
     html_path = path.join(html_dir, html_file)
