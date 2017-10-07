@@ -21,18 +21,40 @@ class DateTime:
                 return 1 if tA[i] > tB[i] else -1
         return 0
 
-class Crime:
-    def __init__(self, crime_id='', crime_type='', report_time=None, occur_time=None, location='', status=''):
-        self.crime_id = crime_id
-        self.crime_type = crime_type
+class Incident:
+    def __init__(self, incident_id='', incident_type='', report_time=None, occur_time=None, location='', status=''):
+        self.incident_id = incident_id
+        self.incident_type = incident_type
         self.report_time = report_time
         self.occur_time = occur_time
         self.location = location
         self.status = status
 
 C_INCIDENT_PATTERN = '[0-9]{2}-[0-9]{6}'
+
+def parse_incident_data(_id, dtdata, incident_descs):
+    incident = Incident(incident_id=_id)
+    dt_tuples = [(dtdata[i], dtdata[i+1]) for i in range(0, len(dtdata), 2)]
+    dt1 = re.sub('[^0-9]', '', ''.join(dt_tuples[0]))
+    dt2 = re.sub('[^0-9]', '', ''.join(dt_tuples[1])) if len(dt_tuples) > 1 else None
+    dt_sorted = [DateTime(dt[:2], dt[2:4], dt[4:6], dt[6:8], dt[8:]) if dt else None for dt in [dt1, dt2]]
+    dt_sorted = dt_sorted if (not dt_sorted[0]) or (not dt_sorted[1]) or dt_sorted[0].compare(dt_sorted[1]) == 1 else [dt_sorted[1], dt_sorted[0]]
+    incident.report_time = dt_sorted[0]
+    incident.occur_time = dt_sorted[1]
+    for text in incident_descs:
+        for status in dfs.STATUSES:
+            if status in text:
+                incident.status = status
+        if not incident.status or incident.status.strip() == '':
+            incident.incident_type = text
+    return incident
+
+def parse_incident_with_id(_id):
+    def parse_incident_fn(dtdata, incident_descs):
+        return parse_incident_data(_id, dtdata, incident_descs)
+    return parse_incident_fn
+
 def extrapolate_row_data(row_data):
-    print(row_data)
     datePattern = re.compile('^[0-9]{2}/[0-9]{2}/[0-9]{2}.*')
     timePattern = re.compile('.*[0-9]{4}(hrs|Hrs).*')
     idPattern   = re.compile(C_INCIDENT_PATTERN)
@@ -42,62 +64,27 @@ def extrapolate_row_data(row_data):
             id_ += d.split('\n')
     del row_data[row_data.index('\n'.join(id_))]
     incident_count = len(id_)
-    crime = Crime()
-    crime.crime_id = id_[0]
+    incident = []
+    incident_parser = parse_incident_with_id(id_[0])
     if incident_count > 1: # processes 1-to-many
-        texts = []
-        dates = []
-        for d in row_data:
-            if datePattern.search(d):
-                dates.append(d)
-            else:
-                texts.append(d)
-        dates = cms.flatten([date.split('\n') for date in dates])
-        texts = cms.flatten([text.split('\n') for text in texts])
-        dt_tuples = [(d,t) for d,t in zip(dates,texts)]
-        for dt_tuple in dt_tuples:
-            date = dt_tuple[0].split(' ')
-            times_list = date[:4]
-            # sorting datetimes to determine report status
-            # joins both strings together and removes all nonnumeric characters
-            print("TL", times_list)
-            dt1 = re.sub('[^0-9]', '', ''.join(times_list[:2]).lower())
-            dt2 = re.sub('[^0-9]', '', ''.join(times_list[2:4]).lower()) if len(times_list) > 2 else None
-            # converts them to DateTime object
-            dts = [DateTime(dt[:2], dt[2:4], dt[4:6], dt[6:8], dt[8:]) if dt else None for dt in [dt1, dt2]]
-            # sorts them based on latest to earliest
-            dts = dts if not dts[0] or not dts[1] and dts[0].compare(dts[1]) == 1 else [dts[1], dts[0]]
-            crime.report_time = dts[0]
-            crime.occur_time = dts[1]
-            crime.crime_type = dt_tuple[1]
-            # attempts to extract information regarding location and status
-            text = ' '.join(date[4:]).lower()
-            # parsing crime by type
-            for status in dfs.STATUSES:
-                def_range = re.search(status, text)
-                if def_range:
-                    crime.status = text[def_range.start():def_range.end()]
-                    crime.location = text[:def_range.start()]
-                    break # if one is found, then break for everything else
+        datagroups = [[] for i in range(len(id_))]
+        for rd in row_data:
+            print("ROWDATA", row_data)
+            rds = rd.split('\n')
+            rd_split = [(i, d) for i in range(len(rds)) for d in rds]
+            for ind, data in rd_split:
+                print("INDDATA", ind, data)
+                datagroups[ind].append(data)
+        print()
     elif incident_count == 1: # processes 1-to-1
         data = cms.flatten([rd.split(' ') for rd in row_data])
         dtdata, texts = cms.categorize(data, lambda n: datePattern.search(n) or timePattern.search(n))
         dtdata = cms.flatten(dtdata)
-        dt_tuples = [(dtdata[i], dtdata[i+1]) for i in range(0, len(dtdata), 2)]
-        dt1 = re.sub('[^0-9]', '', ''.join(dt_tuples[0]))
-        dt2 = re.sub('[^0-9]', '', ''.join(dt_tuples[1])) if len(dt_tuples) > 1 else None
-        dt_sorted = [DateTime(dt[:2], dt[2:4], dt[4:6], dt[6:8], dt[8:]) if dt else None for dt in [dt1, dt2]]
-        dt_sorted = dt_sorted if (not dt_sorted[0]) or (not dt_sorted[1]) or dt_sorted[0].compare(dt_sorted[1]) == 1 else [dt_sorted[1], dt_sorted[0]]
-        crime.report_time = dt_sorted[0]
-        crime.occur_time = dt_sorted[1]
-        for text in texts:
-            for status in dfs.STATUSES:
-                if status in text:
-                    crime.status = status
-            if not crime.status or crime.status.strip() == '':
-                crime.crime_type = text
-    print(crime.__dict__)
-    print()
+        incident.append(incident_parser(dtdata, texts))
+    '''
+    for c in incident:
+        print(c.__dict__)
+    print()'''
     return None
 
 def parse_html(html_dir, html_file):
@@ -124,6 +111,10 @@ def parse_html(html_dir, html_file):
                 row_data[id_].append(div.text.strip()) # add the div to map
             except KeyError:
                 pass
+    for rd in row_data:
+        print(rd, row_data[rd])
+        print()
+    return None
     return dict(((id_, extrapolate_row_data(row)) for id_, row in row_data.items()))
     
 def parse_dir(html_dir):
