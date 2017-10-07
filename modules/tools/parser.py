@@ -93,6 +93,8 @@ def parse_html(html_dir, html_file):
     soup = bsoup(open(html_path), 'html.parser')
     incident_ids = map(lambda n: n.parent.parent, soup(text=re.compile(C_INCIDENT_PATTERN)))
     id_styles = dict()
+    find_midpt = lambda t, h: t+int(h/2)
+    is_inline = lambda target, t, h: target >= t and target <= (t+h)
     for id_ in incident_ids:
         elem_style = id_['style']
         style_list = filter(lambda n: len(n) > 0, map(lambda part: part.strip().split(':'), id_['style'].split(';')))
@@ -102,15 +104,17 @@ def parse_html(html_dir, html_file):
     styled_divs = soup.findAll('div', {'style': re.compile(r'.*top.*')})
     for div in styled_divs:
         if 'top' in div['style']:
-            style_parts = [n for n in div['style'].split(';') if 'top' in n][0].split(':') # extracting the top style value
-            top_attr = style_parts[1] # getting the pixel value
+            style_parts = [n for n in div['style'].split(';') if ('top' in n or 'height' in n)] # extracting the top style value
+            th_vals = dict([(x,int(re.sub('[^0-9]', '', y))) for x,y in [s.split(":") for s in style_parts]])
+            print(th_vals)
+            '''
             try:
                 id_ = rows[top_attr] # get the incident id for that row
                 if id_ not in row_data: # if incident id not in row_data, add it
                     row_data[id_] = []
                 row_data[id_].append(div.text.strip()) # add the div to map
             except KeyError:
-                pass
+                pass'''
     for rd in row_data:
         print(rd, row_data[rd])
         print()
